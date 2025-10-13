@@ -1,0 +1,24 @@
+Metadata-Version: 2.1
+Name: chromedrivermanager
+Version: 0.0.1
+Summary: A simple Python library that check, update or download chrome driver
+Home-page: UNKNOWN
+Author: Joshi Hrithik V
+Author-email: hrithikjoshi987@gmail.com
+License: UNKNOWN
+Keywords: python,chrome,chromedriver,selenium,webdriver,driver
+Platform: UNKNOWN
+Classifier: Development Status :: 1 - Planning
+Classifier: Intended Audience :: Developers
+Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: Unix
+Classifier: Operating System :: MacOS :: MacOS X
+Classifier: Operating System :: Microsoft :: Windows
+Description-Content-Type: text/markdown
+Requires-Dist: requests
+Requires-Dist: pypiwin32
+Requires-Dist: pywin32
+
+UNKNOWN
+
+
