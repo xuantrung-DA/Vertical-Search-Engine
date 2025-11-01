@@ -1,0 +1,129 @@
+/* static/styles.css */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: #f8f9fa;
+    color: #212529;
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+h1 {
+    text-align: center;
+    color: #343a40;
+}
+
+p {
+    text-align: center;
+    color: #6c757d;
+    font-size: 1.1em;
+}
+
+.search-form {
+    display: flex;
+    margin-top: 30px;
+}
+
+.search-form input[type="text"] {
+    flex-grow: 1;
+    padding: 12px 15px;
+    font-size: 16px;
+    border: 1px solid #ced4da;
+    border-radius: 4px 0 0 4px;
+    outline: none;
+}
+
+.search-form button {
+    padding: 12px 20px;
+    font-size: 16px;
+    border: 1px solid #007bff;
+    background-color: #007bff;
+    color: white;
+    cursor: pointer;
+    border-radius: 0 4px 4px 0;
+}
+
+.header-form {
+    margin-top: 0;
+    align-items: center;
+}
+
+.home-link {
+    font-size: 24px;
+    text-decoration: none;
+    margin-right: 15px;
+}
+
+hr {
+    border: none;
+    border-top: 1px solid #e9ecef;
+    margin: 25px 0;
+}
+
+.result-count {
+    text-align: left;
+    font-size: 0.9em;
+    color: #6c757d;
+}
+
+.result-item {
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.result-item h3 a {
+    color: #0056b3;
+    text-decoration: none;
+}
+.result-item h3 a:hover {
+    text-decoration: underline;
+}
+
+.result-url {
+    font-size: 0.8em;
+    color: #28a745;
+    margin-top: -10px;
+    word-break: break-all;
+}
+
+.snippet {
+    text-align: left;
+    color: #343a40;
+    line-height: 1.6;
+}
+
+.snippet strong {
+    color: #c82333;
+    font-weight: bold;
+}
+
+.score {
+    display: inline-block;
+    font-size: 0.8em;
+    background-color: #e9ecef;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #495057;
+}
+
+.ingredients, .instructions {
+    margin-top: 10px;
+    font-size: 0.95em;
+    color: #343a40;
+}
+.ingredients h4, .instructions h4 {
+    color: #007bff;
+    margin-bottom: 5px;
+}
+.ingredients ul, .instructions ol {
+    margin-left: 20px;
+}

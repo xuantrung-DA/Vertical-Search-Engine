@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kết quả cho: {{ query }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <form action="/search" method="get" class="search-form header-form">
+            <a href="/" class="home-link">🍳</a>
+            <input type="text" name="query" value="{{ query }}" placeholder="Nhập tên món ăn...">
+            <button type="submit">Tìm kiếm</button>
+        </form>
+
+        <hr>
+
+        <div class="results-container">
+            {% if results %}
+                <p class="result-count">Tìm thấy {{ results|length }} kết quả cho "<strong>{{ query }}</strong>"</p>
+                
+                {% for result in results %}
+                <div class="result-item">
+                    <h3>
+                        <a href="{{ result.url }}" target="_blank">{{ result.title }}</a>
+                    </h3>
+                    <p class="snippet">
+                        ... {{ result.snippet | safe }} ...
+                    </p>
+                    <span class="score">Score: {{ "%.2f"|format(result.score) }}</span>
+
+                    {% if result.ingredients %}
+                        <div class="ingredients">
+                            <h4>🧂 Nguyên liệu:</h4>
+                            <ul>
+                                {% for ing in result.ingredients %}
+                                    <li>{{ ing }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+
+                    {% if result.instructions %}
+                        <div class="instructions">
+                            <h4>👨‍🍳 Cách làm:</h4>
+                            <ol>
+                                {% for step in result.instructions %}
+                                    <li>{{ step }}</li>
+                                {% endfor %}
+                            </ol>
+                        </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+
+            {% else %}
+                <p class="result-count">Không tìm thấy kết quả nào cho "<strong>{{ query }}</strong>". Vui lòng thử lại với từ khóa khác.</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
