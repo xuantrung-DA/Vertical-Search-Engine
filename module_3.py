@@ -1,12 +1,11 @@
+# path: module_3.py
 # -*- coding: utf-8 -*-
 """
 Module 3 – Retrieval (BM25) + Generic Phrase/Proximity Re-ranking (Strict & Fast)
 
-- Output: Title, URL, Snippet
+- Output: Title, URL, Snippet (+ Ingredients, Instructions)
 - “Liên quan trước”: exact phrase/full cover chứa anchor → partial giảm dần
-- Giữ kỹ thuật gốc; bổ sung:
-  * Stage-1 có thể dùng bitset.pkl (nhanh) hoặc fallback union-postings (cũ)
-  * Sắp xếp lại thứ tự hàm theo flow
+- Bổ sung để UI có thể hiển thị ingredients & instructions trong results.html
 """
 
 import json
@@ -14,17 +13,14 @@ import math
 import re
 import os
 import pickle
-from dataclasses import dataclass
+from dataclasses import dataclass, field  # cần field cho list mặc định an toàn
 from typing import Any, Dict, List, Optional, Tuple, Iterable, Set
 
+from functools import lru_cache
 # =============================================================================
 # 0) TOKENIZER & TEXT UTILS
 # =============================================================================
 
-try:
-    from underthesea import word_tokenize
-except Exception:
-    word_tokenize = None
 
 VIETNAMESE_STOPWORDS = {
     "và", "của", "là", "cho", "với", "những", "các", "được", "trong", "khi",
@@ -33,7 +29,6 @@ VIETNAMESE_STOPWORDS = {
 }
 
 def clean_text(text: str) -> List[str]:
-    """Lowercase, giữ chữ/số/khoảng trắng, tách từ, bỏ stopwords."""
     if not text:
         return []
     text = text.lower()
@@ -47,7 +42,6 @@ def clean_text(text: str) -> List[str]:
     return [t for t in (tok.strip() for tok in tokens) if t and t not in VIETNAMESE_STOPWORDS]
 
 def _tokens_seq(text: str) -> List[str]:
-    """Giữ thứ tự token (phục vụ phrase & proximity)."""
     return clean_text(text)
 
 def ngrams(tokens: List[str], n: int) -> List[List[str]]:
@@ -80,6 +74,8 @@ class SearchResult:
     url: Optional[str]
     score: float
     snippet: str = ""
+    ingredients: List[str] = field(default_factory=list)   # nguyên liệu
+    instructions: List[str] = field(default_factory=list)  # hướng dẫn
 
 def load_recipes(files: List[str]) -> List[Dict[str, Any]]:
     recipes: List[Dict[str, Any]] = []
@@ -97,15 +93,13 @@ def load_inverted_index(path: str) -> Dict[str, Dict[str, Dict[str, Any]]]:
 # =============================================================================
 
 class CorpusView:
-    """Cache các đặc trưng hay dùng để tránh tính lại nhiều lần."""
+    """Cache để tránh tính lặp, tăng tốc."""
     def __init__(self, recipes: List[Dict[str, Any]]):
         self.recipes = recipes
         self.N = len(recipes)
-        # BM25 doc tokens/lengths
         self.doc_tokens: List[List[str]] = [self._doc_tokens(r) for r in recipes]
         self.doc_lens: List[int] = [len(toks) or 1 for toks in self.doc_tokens]
         self.avgdl: float = (sum(self.doc_lens) / self.N) if self.N else 0.0
-        # Field seqs & sets
         self.title_seqs, self.body_seqs = self._field_seqs(recipes)
         self.title_token_sets: List[Set[str]] = [set(seq) for seq in self.title_seqs]
         self.ing_token_sets: List[Set[str]] = [
@@ -127,7 +121,6 @@ class CorpusView:
 
 # =============================================================================
 # 3) STAGE-1 (LỌC THÔ)
-# 3.1) Cheap scoring & union-postings (bản cũ / fallback)
 # =============================================================================
 
 from heapq import nlargest
@@ -141,14 +134,6 @@ def _cheap_signal_scores(
     q_tokens: List[str],
     anchor: str,
 ) -> int:
-    """
-    Điểm 'rẻ' dùng cho Stage-1:
-    - exact phrase ở title/body (ưu tiên mạnh)
-    - số token truy vấn xuất hiện trong title/body (title nặng hơn)
-    - title bắt đầu bằng token đầu
-    - anchor trong title
-    - có ít nhất một cặp kề trong w=3
-    """
     t_seq = cv.title_seqs[doc_id]
     b_seq = cv.body_seqs[doc_id]
     tset  = cv.title_token_sets[doc_id]
@@ -187,7 +172,6 @@ def stage1_coarse_candidates(
     anchor: str,
     k_coarse: int = 50,
 ) -> List[int]:
-    """UNION postings + cheap scoring (fallback)."""
     cand_all = set()
     for t in query_tokens:
         p = inverted_index.get(t)
@@ -217,7 +201,7 @@ def stage1_coarse_candidates(
     return [d for _, d in (topA + topB)]
 
 # =============================================================================
-# 3.2) Stage-1 dùng BITSET (nếu có file pkl)
+# 3.2) Stage-1 dùng BITSET (nếu có)
 # =============================================================================
 
 @dataclass
@@ -230,7 +214,6 @@ def _load_bitset(path: Optional[str]) -> Optional[_BitsetIndex]:
         return None
     with open(path, "rb") as f:
         obj = pickle.load(f)
-    # hỗ trợ payload từ bitset.py (dict) hoặc dataclass
     token_bits = getattr(obj, "token_bits", None) or obj.get("token_bits")
     N = getattr(obj, "N", None) or obj.get("N")
     return _BitsetIndex(token_bits=token_bits, N=N)
@@ -253,7 +236,6 @@ def _bits_union(bsi: _BitsetIndex, tokens: List[str]) -> int:
     return u
 
 def _iter_set_bits(bits: int):
-    """Yield doc_ids (0-based) có bit=1."""
     while bits:
         lsb = bits & -bits
         idx = (lsb.bit_length() - 1)
@@ -267,14 +249,13 @@ def stage1_bitset_candidates(
     cv: CorpusView,
     k_coarse: int = 50,
 ) -> List[int]:
-    """Stage-1 cực nhanh bằng bitset: chọn ứng viên, rồi cheap-score & top-k."""
     cand_anchor = _bits_title(bsi, anchor) | _bits_body(bsi, anchor)
     cand_all = _bits_union(bsi, query_tokens)
     cand_bits = cand_anchor if cand_anchor else cand_all
     if cand_bits == 0:
         cand_bits = cand_all
     if cand_bits == 0:
-        cand_bits = (1 << cv.N) - 1  # all docs
+        cand_bits = (1 << cv.N) - 1
 
     scored = []
     for doc_id in _iter_set_bits(cand_bits):
@@ -313,7 +294,6 @@ def compute_bm25_scores(
     ingredients_boost: float = 1.2,
     candidate_docs: Optional[Iterable[int]] = None,
 ) -> Dict[int, float]:
-    """BM25 (single-field) + field boosts; chỉ tính trên candidate_docs nếu có."""
     N = cv.N
     scores: Dict[int, float] = {}
     cand_set: Optional[Set[int]] = set(candidate_docs) if candidate_docs is not None else None
@@ -377,7 +357,7 @@ def df_ratio(token: str, inverted_index, N: int) -> float:
 
 def effective_query_tokens(query_tokens: List[str], inverted_index, N: int, tau: float = 0.25) -> List[str]:
     keep = [t for t in query_tokens if df_ratio(t, inverted_index, N) <= tau]
-    return keep or query_tokens[:]  # fallback nếu lọc sạch
+    return keep or query_tokens[:]
 
 def must_have_with_anchor(
     scores: Dict[int, float],
@@ -386,7 +366,6 @@ def must_have_with_anchor(
     query_tokens: List[str],
     anchor: str
 ) -> Dict[int, float]:
-    """Yêu cầu: anchor xuất hiện + >=1 essential khác xuất hiện (precision↑)."""
     intent = build_query_intent(query_tokens, inverted_index, cv.N)
     essential = intent["essential_terms"]
     filtered: Dict[int, float] = {}
@@ -405,7 +384,6 @@ def must_have_any_token(
     query_tokens: List[str],
     anchor: Optional[str] = None
 ) -> Dict[int, float]:
-    """Fallback cho truy vấn ngắn (≤2 token): giữ doc chứa ≥1 token; ưu tiên anchor."""
     qt_set = set(query_tokens)
     strong, weak = {}, {}
     for doc_id, s in scores.items():
@@ -432,7 +410,6 @@ def rerank_generic(
     beta_prox_body: float = 0.4,
     gamma_missing_idf: float = 0.9,
 ) -> Dict[int, float]:
-    """Boost cụm (2/3-gram), boost proximity, phạt mềm thiếu essential terms."""
     intent = build_query_intent(query_tokens, inverted_index, cv.N)
     idf = intent["idf"]
     essential = intent["essential_terms"]
@@ -486,7 +463,6 @@ def rerank_phrase_tiering(
     big_bonus_title: float = 8.0,
     big_bonus_body: float = 4.0,
 ) -> Tuple[Dict[int, float], Set[int]]:
-    """Tiering bonus cho exact phrase 3-gram/2-gram (ưu tiên title)."""
     p3 = ngrams(query_tokens, 3)
     p2 = ngrams(query_tokens, 2)
     title_phrase_hit: Set[int] = set()
@@ -521,7 +497,6 @@ def rerank_phrase_tiering(
 # =============================================================================
 
 def _highlight(text: str, raw_query: str) -> str:
-    """Bôi đậm (**) những chuỗi con khớp từ khóa (không phân biệt hoa thường)."""
     if not text or not raw_query:
         return text or ""
     terms = [re.escape(t) for t in raw_query.strip().split() if t]
@@ -531,7 +506,6 @@ def _highlight(text: str, raw_query: str) -> str:
     return pattern.sub(r"**\1**", text)
 
 def build_snippet(recipe: Dict[str, Any], raw_query: str, max_len: int = 220) -> str:
-    """Chọn 1 đoạn có từ khóa (ưu tiên title → lines có nhiều token truy vấn → ingredients)."""
     candidates: List[str] = []
     title = (recipe.get("title", "") or "").strip()
     if title:
@@ -558,7 +532,7 @@ def build_snippet(recipe: Dict[str, Any], raw_query: str, max_len: int = 220) ->
     return _highlight(text, raw_query)
 
 # =============================================================================
-# 7) CANDIDATES (anchor-first helper giữ nguyên để không đổi logic)
+# 7) CANDIDATES (anchor-first helper)
 # =============================================================================
 
 def postings_set(token: str, inverted_index) -> Set[int]:
@@ -566,7 +540,6 @@ def postings_set(token: str, inverted_index) -> Set[int]:
     return set(map(int, p.keys())) if p else set()
 
 def build_candidates_anchor_first(query_tokens: List[str], inverted_index, top_k: int) -> List[int]:
-    """Giữ lại theo logic cũ (không can thiệp)."""
     if not query_tokens:
         return []
     anchor = query_tokens[0]
@@ -614,12 +587,6 @@ def compute_relevance_tier(
     anchor: Optional[str],
     prox_window: int = 3,
 ) -> Tuple[int, float, bool]:
-    """
-    (tier, coverage_ratio, title_phrase_hit_flag_for_sort)
-    Tier 0: exact phrase (+anchor trong title) + coverage_thresh (+adjacency nếu |Q|≥4)
-    Tier 1: full cover (+anchor trong title/ingredients)
-    Tier ≥2: partial; thiếu anchor bị hạ tier.
-    """
     t_seq = cv.title_seqs[doc_id]
     b_seq = cv.body_seqs[doc_id]
     seq_set = set(t_seq) | set(b_seq)
@@ -655,6 +622,71 @@ def compute_relevance_tier(
     return (tier_partial, cov_ratio, bool(exact_title))
 
 # =============================================================================
+# Cache loaders tối ưu
+# -----------------------------
+# 1) Tắt underthesea cho nhanh
+# -----------------------------
+# Nếu muốn bỏ hẳn underthesea (tokenizer nặng), bật cờ này:
+_FORCE_SIMPLE_TOKENIZER = True
+try:
+    from underthesea import word_tokenize as _uts_tok
+except Exception:
+    _uts_tok = None
+word_tokenize = (None if _FORCE_SIMPLE_TOKENIZER else _uts_tok)
+
+# -----------------------------
+# 2) Cache loaders (đọc 1 lần)
+# -----------------------------
+# orjson/ujson càng nhanh càng tốt (nếu có), fallback json
+try:
+    import orjson as _jsonlib
+    def _loads(b): return _jsonlib.loads(b)
+except Exception:
+    try:
+        import ujson as _jsonlib
+        def _loads(b): return _jsonlib.loads(b)
+    except Exception:
+        _jsonlib = None
+        def _loads(b): return json.loads(b)
+
+@lru_cache(maxsize=1)
+def _load_inverted_index_cached(path: str) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    with open(path, "rb") as f:
+        data = f.read()
+    return _loads(data) if _jsonlib else json.loads(data.decode("utf-8"))
+
+def load_inverted_index(path: str) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    # wrapper giữ tên hàm cũ, nhưng bên trong đã cache
+    return _load_inverted_index_cached(path)
+
+@lru_cache(maxsize=4)
+def _load_recipes_cached(key: Tuple[str, ...]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for file in key:
+        with open(file, "rb") as f:
+            data = f.read()
+        out.extend(_loads(data) if _jsonlib else json.loads(data.decode("utf-8")))
+    return out
+
+def load_recipes(files: List[str]) -> List[Dict[str, Any]]:
+    # key phải hashable để lru_cache hoạt động
+    return _load_recipes_cached(tuple(files))
+
+@lru_cache(maxsize=1)
+def _load_bitset_cached(path: Optional[str]) -> Optional[_BitsetIndex]:
+    if not path or not os.path.exists(path):
+        return None
+    with open(path, "rb") as f:
+        obj = pickle.load(f)
+    token_bits = getattr(obj, "token_bits", None) or obj.get("token_bits")
+    N = getattr(obj, "N", None) or obj.get("N")
+    return _BitsetIndex(token_bits=token_bits, N=N)
+
+def _load_bitset(path: Optional[str]) -> Optional[_BitsetIndex]:
+    return _load_bitset_cached(path)
+
+
+# =============================================================================
 # 9) SEARCH PIPELINE
 # =============================================================================
 
@@ -670,12 +702,8 @@ def search(
     *,
     bitset_path: Optional[str] = None,
     stage1_k: int = 50,
+    score_threshold: float = 0.0,
 ) -> List[SearchResult]:
-    """
-    query → tokenize → Stage-1 (bitset nếu có, else union-postings) → BM25
-          → must-have(anchor)/fallback → generic re-rank → phrase tiering
-          → relevance tiering → sort → build results
-    """
     if not raw_query or not raw_query.strip():
         return []
 
@@ -686,16 +714,13 @@ def search(
     inverted_index = load_inverted_index(inverted_index_path)
     cv = CorpusView(recipes)
 
-    # tokenize
     query_tokens = clean_text(raw_query)
     if not query_tokens:
         return []
     anchor = query_tokens[0]
 
-    # dynamic query-stopword cho BM25 core
     q_eff = effective_query_tokens(query_tokens, inverted_index, cv.N, tau=0.25)
 
-    # Stage-1: dùng bitset nếu có, ngược lại fallback cũ
     bsi = _load_bitset(bitset_path)
     if bsi is not None:
         cand_docs = stage1_bitset_candidates(
@@ -714,7 +739,6 @@ def search(
             k_coarse=stage1_k,
         )
 
-    # BM25 trên candidates
     scores = compute_bm25_scores(
         query_tokens=q_eff,
         inverted_index=inverted_index,
@@ -727,7 +751,6 @@ def search(
     if not scores:
         return []
 
-    # must-have với anchor (nghiêm ngặt)
     strict_scores = must_have_with_anchor(
         scores=scores,
         cv=cv,
@@ -736,7 +759,6 @@ def search(
         anchor=anchor,
     )
 
-    # fallback cho truy vấn rất ngắn (≤2 token)
     if not strict_scores and len(query_tokens) <= 2:
         filtered_scores = must_have_any_token(
             scores=scores,
@@ -750,7 +772,6 @@ def search(
     if not filtered_scores:
         return []
 
-    # generic re-rank
     scores = rerank_generic(
         scores=filtered_scores,
         cv=cv,
@@ -764,7 +785,6 @@ def search(
         gamma_missing_idf=0.9,
     )
 
-    # phrase tiering
     scores, title_phrase_hit = rerank_phrase_tiering(
         scores=scores,
         cv=cv,
@@ -773,7 +793,6 @@ def search(
         big_bonus_body=4.0,
     )
 
-    # (giữ nhịp cũ: generic → phrase lặp lại)
     scores = rerank_generic(
         scores=scores,
         cv=cv,
@@ -793,10 +812,12 @@ def search(
         big_bonus_title=8.0,
         big_bonus_body=4.0,
     )
-
-    # relevance tiering + final sort
+    
     pack: List[Tuple[Tuple[int, float, bool], int, float]] = []
     for doc_id, s in scores.items():
+        # Áp dụng threshold để lọc kết quả yếu
+        if s < score_threshold:
+            continue
         tier_info = compute_relevance_tier(doc_id, cv, query_tokens, anchor, prox_window=3)
         tier_info = (tier_info[0], tier_info[1], tier_info[2] or (doc_id in title_phrase_hit))
         pack.append((tier_info, doc_id, s))
@@ -804,10 +825,10 @@ def search(
     pack.sort(key=lambda x: (x[0][0], -x[2], -x[0][1], not x[0][2]))
     ranked = pack[:top_k]
 
-    # build output
     results: List[SearchResult] = []
     for (_, _cov_ratio, _title_hit), doc_id, score in ranked:
         r = cv.recipes[doc_id]
+        # Quan trọng: truyền kèm ingredients & instructions để UI hiển thị
         results.append(
             SearchResult(
                 doc_id=doc_id,
@@ -815,6 +836,8 @@ def search(
                 url=r.get("url"),
                 score=round(float(score), 6),
                 snippet=build_snippet(r, raw_query),
+                ingredients=r.get("ingredients", []),
+                instructions=r.get("instructions", []),
             )
         )
     return results
@@ -838,8 +861,8 @@ def main():
     parser.add_argument("query", nargs="?", default="Canh chua tôm", type=str)
     parser.add_argument("--index", default="inverted_index.json")
     parser.add_argument("--data", nargs="+", default=["dienmayxanh.json", "monngonmoingay_multi.json"])
-    parser.add_argument("--stage1", type=int, default=50, help="Số ứng viên lấy ở Stage-1 (lọc thô)")
-    parser.add_argument("--bitset", default=None, help="Đường dẫn bitset.pkl (nếu có sẽ dùng Stage-1 siêu nhanh)")
+    parser.add_argument("--stage1", type=int, default=50)
+    parser.add_argument("--bitset", default=None)
     parser.add_argument("--topk", type=int, default=10)
     parser.add_argument("--title_boost", type=float, default=2.5)
     parser.add_argument("--ingredients_boost", type=float, default=1.2)

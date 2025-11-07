@@ -7,55 +7,76 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <div class="container">
-        <form action="/search" method="get" class="search-form header-form">
-            <a href="/" class="home-link">🍳</a>
-            <input type="text" name="query" value="{{ query }}" placeholder="Nhập tên món ăn...">
-            <button type="submit">Tìm kiếm</button>
-        </form>
-
-        <hr>
+    <div class="results-page">
+        <div class="results-header">
+            <a href="/" class="logo-link">🍳 Bếp Ơi</a>
+            <form action="/search" method="get" class="search-form-header">
+                <input 
+                    type="text" 
+                    name="query" 
+                    value="{{ query }}" 
+                    placeholder="Tìm kiếm công thức..." 
+                    class="search-input-header"
+                >
+                <button type="submit" class="search-button-header">🔍</button>
+            </form>
+        </div>
 
         <div class="results-container">
             {% if results %}
-                <p class="result-count">Tìm thấy {{ results|length }} kết quả cho "<strong>{{ query }}</strong>"</p>
-                
-                {% for result in results %}
-                <div class="result-item">
-                    <h3>
-                        <a href="{{ result.url }}" target="_blank">{{ result.title }}</a>
-                    </h3>
-                    <p class="snippet">
-                        ... {{ result.snippet | safe }} ...
-                    </p>
-                    <span class="score">Score: {{ "%.2f"|format(result.score) }}</span>
-
-                    {% if result.ingredients %}
-                        <div class="ingredients">
-                            <h4>🧂 Nguyên liệu:</h4>
-                            <ul>
-                                {% for ing in result.ingredients %}
-                                    <li>{{ ing }}</li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                    {% endif %}
-
-                    {% if result.instructions %}
-                        <div class="instructions">
-                            <h4>👨‍🍳 Cách làm:</h4>
-                            <ol>
-                                {% for step in result.instructions %}
-                                    <li>{{ step }}</li>
-                                {% endfor %}
-                            </ol>
-                        </div>
-                    {% endif %}
+                <div class="result-summary">
+                    <h2>Kết quả tìm kiếm</h2>
+                    <p class="result-count">Tìm thấy <span class="count-number">{{ results|length }}</span> kết quả cho "<strong>{{ query }}</strong>"</p>
                 </div>
-                {% endfor %}
+                
+                <div class="results-list">
+                    {% for result in results %}
+                    <div class="result-card">
+                        <div class="result-header">
+                            <h3 class="result-title">
+                                <a href="{{ result.url }}" target="_blank">{{ result.title }}</a>
+                            </h3>
+                            <span class="result-score">{{ "%.2f"|format(result.score) }} / 100</span>
+                        </div>
+                        
+                        <p class="result-snippet">
+                            {{ result.snippet | safe }}
+                        </p>
+
+                        {% if result.ingredients %}
+                            <div class="result-section ingredients-section">
+                                <h4 class="section-title">🧂 Nguyên liệu</h4>
+                                <ul class="ingredients-list">
+                                    {% for ing in result.ingredients %}
+                                        <li>{{ ing }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+
+                        {% if result.instructions %}
+                            <div class="result-section instructions-section">
+                                <h4 class="section-title">👨‍🍳 Cách làm</h4>
+                                <ol class="instructions-list">
+                                    {% for step in result.instructions %}
+                                        <li>{{ step }}</li>
+                                    {% endfor %}
+                                </ol>
+                            </div>
+                        {% endif %}
+
+                        <a href="{{ result.url }}" target="_blank" class="result-link">Xem công thức đầy đủ →</a>
+                    </div>
+                    {% endfor %}
+                </div>
 
             {% else %}
-                <p class="result-count">Không tìm thấy kết quả nào cho "<strong>{{ query }}</strong>". Vui lòng thử lại với từ khóa khác.</p>
+                <div class="no-results">
+                    <div class="no-results-icon">😕</div>
+                    <h2>Không tìm thấy kết quả</h2>
+                    <p>Rất tiếc, không có công thức nào cho "<strong>{{ query }}</strong>"</p>
+                    <p class="no-results-hint">Vui lòng thử lại với từ khóa khác hoặc <a href="/">quay lại trang chủ</a></p>
+                </div>
             {% endif %}
         </div>
     </div>

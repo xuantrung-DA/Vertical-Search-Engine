@@ -17,6 +17,7 @@ INVERTED_INDEX_PATH = "inverted_index.json"
 RECIPE_FILES = ["dienmayxanh.json", "monngonmoingay_multi.json"]
 BITSET_PATH = "bitset_recipes.pkl"  # Đặt là None nếu không dùng bitset
 TOP_K = 10 # Số kết quả tối đa muốn hiển thị
+SCORE_THRESHOLD = 10  # Ngưỡng điểm tối thiểu (tăng để lọc kết quả yếu)
 
 
 # =============================================================================
@@ -47,6 +48,7 @@ def search_results():
             recipe_files=RECIPE_FILES,
             bitset_path=BITSET_PATH,
             top_k=TOP_K,
+            score_threshold=SCORE_THRESHOLD,
             # Các tham số khác có thể giữ mặc định từ module_3
             stage1_k=50,
             title_boost=2.5,
