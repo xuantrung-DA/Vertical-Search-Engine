@@ -1,66 +1,89 @@
-Đề Cương Đồ Án Cuối Kỳ
-Đề tài: Xây dựng Máy Tìm Kiếm Chuyên Sâu (Vertical Search Engine) - tìm kiếm công thức món ăn
-Các Bước Thực Hiện (5 Modules)
+# 🍳 Vertical Search Engine: Recipe Finder
+> **Dự án Cuối kỳ:** Hệ thống tìm kiếm chuyên sâu công thức món ăn Việt Nam - **Đã hoàn thành và nghiệm thu.**
 
-Module 1: Thu Thập Dữ Liệu (Crawling)
-Mục tiêu: Viết chương trình tự động lấy dữ liệu từ 1–2 website
-Việc cần làm:
-Chọn website phù hợp với lĩnh vực - dienmayxanh/vapbep + monngonmoingay
-Viết crawler bằng Python (Scrapy hoặc BeautifulSoup) - BeautifulSoup cho dienmayxanh + Selenium cho monngonmoingay
-Tuân thủ robots.txt, không spam website
-Lưu dữ liệu dạng JSON, CSV hoặc database nhỏ (SQLite, MongoDB)
-	
-Module 2: Xử Lý Văn Bản & Xây Dựng Chỉ Mục
-Mục tiêu: Làm sạch dữ liệu và xây dựng hệ thống tìm kiếm nhanh
-Việc cần làm:
-Làm sạch văn bản:
-oTách từ (tokenization)
-oBỏ từ dừng (ví dụ: “và”, “của”, “là”…)
-oChuyển về chữ thường
-o(Nâng cao) Dùng thư viện tiếng Việt như underthesea để tách gốc từ
-Xây dựng chỉ mục ngược (Inverted Index):
-Mỗi từ → danh sách các tài liệu chứa từ đó
-Mỗi tài liệu lưu: docID, số lần xuất hiện, vị trí từ
-Kết quả: Truy vấn nhanh hơn, không cần quét toàn bộ dữ liệu
+<p align="center">
+  <img src="https://img.shields.io/badge/Status-Done-green?style=for-the-badge&logo=checkmarx" />
+  <img src="https://img.shields.io/badge/Review-Graded%20by%20Lecturer-brightgreen?style=for-the-badge&logo=googlekeep" />
+</p>
 
-Module 3: Truy Vấn & Xếp Hạng Kết Quả
-Mục tiêu: Nhận truy vấn từ người dùng và trả về kết quả phù hợp
-Việc cần làm:
-Xử lý truy vấn giống như xử lý dữ liệu
-Tính độ liên quan giữa truy vấn và tài liệu bằng: TF-IDF 
-Có thể thêm trọng số cho:
-Tiêu đề
-Các trường quan trọng (tên món, tên phim…)
-Kết quả: Trả về danh sách kết quả xếp hạng theo độ phù hợp
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/Flask-000000?style=flat-square&logo=flask&logoColor=white" />
+  <img src="https://img.shields.io/badge/MongoDB-47A248?style=flat-square&logo=mongodb&logoColor=white" />
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white" />
+</p>
 
-Module 4: Giao Diện Web
-Mục tiêu: Xây dựng website đơn giản để demo
-Việc cần làm:
-Dùng Flask hoặc Django để làm web
-Trang chủ: có ô nhập tìm kiếm
-Trang kết quả:
-Hiển thị tiêu đề (link về trang gốc)
-Đoạn tóm tắt có highlight từ khóa
-Phân trang nếu có nhiều kết quả
-Yêu cầu: Giao diện rõ ràng, dễ dùng, không cần quá đẹp
+---
 
-Module 5: Đánh Giá Hệ Thống
-Mục tiêu: Kiểm tra xem hệ thống hoạt động tốt không
-Việc cần làm:
-Tạo 15–20 truy vấn mẫu
-Với mỗi truy vấn, đánh dấu 5–10 kết quả đúng (ground truth)
-Viết script tính các chỉ số:
-Precision@10: độ chính xác trong 10 kết quả đầu
-MAP (Mean Average Precision): chất lượng trung bình
-Kết quả: Có số liệu chứng minh hệ thống hoạt động hiệu quả
+## 🎖 Kết quả Dự án
+* **Trạng thái:** Hoàn thành (Finalized).
+* **Đánh giá:** Đã được giảng viên review nội dung và chấm điểm tổng kết.
+* **Ghi chú:** Hệ thống đáp ứng đầy đủ 5 module yêu cầu và vượt qua các bài kiểm tra đánh giá Precision/MAP.
 
-Kết Quả Cần Nộp
-Nộp những gì?
-Source code đầy đủ, có comment rõ ràng
-Báo cáo PDF gồm:
-oKiến trúc hệ thống
-oGiải thích thiết kế & thuật toán
-oKết quả đánh giá (Precision, MAP)
-oPhân công công việc từng thành viên
-Video demo ngắn
-Thuyết trình & Q&A trước giảng viên
+---
+
+## 🏗 Kiến trúc Hệ thống (System Architecture)
+Hệ thống được chia thành 5 module chính, xây dựng theo quy trình xử lý dữ liệu và truy vấn hiện đại:
+
+### 1. 🕷 Module Thu Thập Dữ Liệu (Crawling)
+Tự động lấy dữ liệu từ các nguồn uy tín như *Điện Máy Xanh (Vào Bếp)* và *Món Ngon Mỗi Ngày*.
+* **Công cụ:** `BeautifulSoup` (xử lý HTML tĩnh) & `Selenium` (xử lý nội dung động/JavaScript).
+* **Chiến lược:** Tuân thủ `robots.txt`, giới hạn tần suất request để tránh spam.
+* **Lưu trữ:** Dữ liệu thô được xuất ra định dạng `JSON` hoặc `MongoDB` để phục vụ tiền xử lý.
+
+### 2. 📑 Xử Lý Văn Bản & Indexing
+Chuyển đổi dữ liệu thô thành cấu trúc có thể tìm kiếm nhanh chóng.
+* **NLP:** Sử dụng thư viện `underthesea` để tách từ tiếng Việt (Tokenization).
+* **Preprocessing:** Chuyển chữ thường, loại bỏ Stopwords (và, của, là...), chuẩn hóa gốc từ.
+* **Inverted Index:** Xây dựng chỉ mục ngược giúp ánh xạ từ khóa -> Danh sách tài liệu (DocID, Frequency, Position).
+
+### 3. ⚖️ Truy Vấn & Xếp Hạng (Ranking)
+Trái tim của máy tìm kiếm, đảm bảo kết quả trả về liên quan nhất.
+* **Thuật toán:** Sử dụng trọng số **TF-IDF** để tính toán độ liên quan.
+* **Boosting:** Thêm trọng số ưu tiên cho các trường quan trọng như `Tiêu đề món ăn` và `Nguyên liệu chính`.
+* **Flow:** Query người dùng -> Preprocessing -> Scoring -> Ranked List.
+
+### 4. 💻 Giao Diện Web (Web UI)
+Demo hệ thống trực quan cho người dùng cuối.
+* **Framework:** `Flask` (hoặc Django) tích hợp RESTful API.
+* **Tính năng:**
+    * Ô tìm kiếm thông minh.
+    * Trang kết quả với Snippet (đoạn tóm tắt) có **highlight** từ khóa.
+    * Phân trang (Pagination) và liên kết ngược về nguồn gốc của món ăn.
+
+### 5. 📊 Đánh Giá Hệ Thống (Evaluation)
+Đo lường hiệu quả bằng các chỉ số khoa học với bộ test 20 truy vấn mẫu.
+* **Precision@10:** Độ chính xác trong 10 kết quả đầu tiên.
+* **MAP (Mean Average Precision):** Đánh giá chất lượng xếp hạng tổng thể.
+* **Ground Truth:** So sánh với tập kết quả chuẩn được gán nhãn thủ công.
+
+---
+
+## 🛠 My Stack & Tools
+<p align="left">
+  <a href="https://skillicons.dev">
+    <img src="https://skillicons.dev/icons?i=py,flask,mongodb,selenium,docker,vscode,git&theme=dark" />
+  </a>
+</p>
+
+---
+
+## 📂 Danh mục Nộp bài (Deliverables)
+| STT | Hạng mục | Mô tả |
+|---|---|---|
+| 1 | **Source Code** | Toàn bộ mã nguồn kèm comment chi tiết. |
+| 2 | **Báo cáo PDF** | Giải thích kiến trúc, thuật toán và phân công công việc. |
+| 3 | **Video Demo** | Video ngắn giới thiệu luồng hoạt động của web. |
+| 4 | **Thuyết trình** | Slide trình bày và các câu hỏi Q&A. |
+
+---
+
+## 👥 Đội ngũ thực hiện
+* **Nhóm trưởng:** Xuân Trung - Quản lý chung & Module Ranking.
+* **Thành viên:** Thành Phát - Phát triển Crawler & Web UI.
+* *Cùng sự đóng góp của các thành viên trong nhóm 5 người.*
+
+---
+<p align="center">
+Built with ❤️ by AI Engineering Students
+</p>
